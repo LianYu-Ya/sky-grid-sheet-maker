@@ -2,6 +2,7 @@
 """浏览历史乐谱弹窗、标题输入对话框与导出预览对话框。"""
 
 import os
+import subprocess
 
 from PySide6.QtCore import QEvent, QSize, Qt
 from PySide6.QtGui import QColor, QPixmap
@@ -41,6 +42,7 @@ class BrowseSheetsDialog(QDialog):
     """列出数据目录下的历史乐谱（.ggp）。
 
     每行显示乐谱名，行内提供"复制 / 重命名 / 删除"三个操作按钮；
+    底部"打开文件所在位置"可在资源管理器中定位选中乐谱；
     双击或点"打开"返回选中路径。
     """
 
@@ -53,7 +55,7 @@ class BrowseSheetsDialog(QDialog):
 
         layout = QVBoxLayout(self)
 
-        hint = QLabel("双击或选中后点“打开”载入乐谱；行内按钮可复制 / 重命名 / 删除")
+        hint = QLabel("双击或选中后点“打开”载入乐谱；行内按钮可复制 / 重命名 / 删除；“打开文件所在位置”可在资源管理器中定位文件")
         layout.addWidget(hint)
 
         self._list = QListWidget()
@@ -68,11 +70,15 @@ class BrowseSheetsDialog(QDialog):
 
         btn_row = QHBoxLayout()
         btn_row.addStretch(1)
+        locate_btn = QPushButton("打开文件所在位置")
+        locate_btn.setToolTip("在资源管理器中定位当前选中的乐谱文件")
+        locate_btn.clicked.connect(self._open_location)
         cancel_btn = QPushButton("取消")
         cancel_btn.clicked.connect(self.reject)
         open_btn = QPushButton("打开")
         open_btn.setDefault(True)
         open_btn.clicked.connect(self._on_open)
+        btn_row.addWidget(locate_btn)
         btn_row.addWidget(cancel_btn)
         btn_row.addWidget(open_btn)
         layout.addLayout(btn_row)
@@ -145,6 +151,20 @@ class BrowseSheetsDialog(QDialog):
             return
         delete_sheet(path)
         self._reload(self._data_dir)
+
+    def _open_location(self):
+        """在资源管理器中打开当前选中乐谱所在的文件夹并定位该文件。"""
+        item = self._list.currentItem()
+        if item is None:
+            return
+        path = item.data(0)
+        if not path:
+            return
+        if os.name == "nt":
+            # /select, 后跟路径，定位并选中文件
+            subprocess.Popen(["explorer", "/select,", os.path.normpath(path)])
+        else:
+            subprocess.Popen(["xdg-open", os.path.dirname(path)])
 
     def _on_open(self):
         """打开当前选中项：记录路径并 accept。"""

@@ -39,6 +39,8 @@ python main.py
 
 或直接双击 `启动.bat`（自动检测 Python、自动安装 PySide6 后启动）。
 
+不想装环境？直接下载现成的 Windows 打包版：[v1.0.0 Release](https://github.com/LianYu-Ya/sky-grid-sheet-maker/releases/tag/v1.0.0)（解压即用，已含 `sheets/` 与 `outputs/` 目录）。
+
 ## 操作说明
 
 | 操作 | 效果 |

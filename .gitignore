@@ -1,0 +1,16 @@
+# 用户数据
+sheets/
+outputs/
+
+# 打包/缓存产物
+dist/
+build/
+__pycache__/
+*.spec
+
+# IDE / 无关文件
+.trae/
+*.log
+
+# 临时图片
+乐谱.png

@@ -1450,6 +1450,25 @@ def main() -> int:
               model.has_note(4, "Y") and model.num_columns() == 5,
               f"cols={model.num_columns()} notes4={model.notes(4)}")
 
+        # ---------------- T32: 格子谱样式 ----------------
+        from grid_style import (STYLE_OPTIONS, DEFAULT_STYLE, GridStyle,
+                                is_valid_style, draws_inner_lines,
+                                draws_outer_frame, inner_pen_width)
+        check("T32a 样式表含 6 项且枚举合法",
+              len(STYLE_OPTIONS) == 6 and is_valid_style("full_frame")
+              and not is_valid_style("bad_style"))
+        check("T32b 内外框/线宽判定",
+              draws_outer_frame("full_frame") and draws_outer_frame("thick_frame")
+              and not draws_outer_frame("default")
+              and inner_pen_width("thick_inner") == 2
+              and inner_pen_width("default") == 1
+              and not draws_inner_lines("no_border"))
+        gs = GridStyle.coerce(style="thick_frame", bg_color="bad",
+                              border_color="#333333")
+        check("T32c GridStyle 非法值回退默认",
+              gs.style == "thick_frame" and gs.bg_color == "#FFFFFF"
+              and gs.border_color == "#333333")
+
         window.close()   # closeEvent：dirty=True → question 已注入 Yes → 放行
 
         # ---------------- 汇总 ----------------

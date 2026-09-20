@@ -28,6 +28,10 @@ import datetime
 import re
 
 from model import KEYS, ROWS, NoteGrid, DEFAULT_MARK_COLOR, DEFAULT_CHORD_COLOR
+from grid_style import (
+    DEFAULT_BG_COLOR, DEFAULT_BORDER_COLOR, DEFAULT_STYLE,
+    is_valid_style,
+)
 
 VERSION = 2
 
@@ -71,11 +75,15 @@ def default_output_dir() -> pathlib.Path:
 
 def save_ggp(path, title: str, columns_per_line: int, grid: NoteGrid,
              mark_color: str | None = None,
-             chord_color: str | None = None) -> None:
+             chord_color: str | None = None,
+             style: str | None = None,
+             bg_color: str | None = None,
+             border_color: str | None = None) -> None:
     """将乐谱保存为 .ggp JSON 文件（version 2）。
 
     若文件已存在，保留原 created_at，只更新 updated_at。
     mark_color / chord_color 非空时写入可选字段（#RRGGBB），为空则省略。
+    style 总是写入（非法回退默认）；bg_color / border_color 非空时写入。
     编码 utf-8、ensure_ascii=False。
     """
     path = pathlib.Path(path)
@@ -98,6 +106,11 @@ def save_ggp(path, title: str, columns_per_line: int, grid: NoteGrid,
         "rows": ROWS,
         "note_grid": grid.to_list(),
     }
+    data["grid_style"] = style if is_valid_style(style) else DEFAULT_STYLE
+    if bg_color:
+        data["bg_color"] = str(bg_color)
+    if border_color:
+        data["border_color"] = str(border_color)
     if mark_color:
         data["mark_color"] = str(mark_color)
     if chord_color:
@@ -168,6 +181,11 @@ def load_ggp(path) -> dict:
 
     mark_color = _read_color(raw.get("mark_color"), DEFAULT_MARK_COLOR)
     chord_color = _read_color(raw.get("chord_color"), DEFAULT_CHORD_COLOR)
+    grid_style = raw.get("grid_style")
+    if not is_valid_style(grid_style):
+        grid_style = DEFAULT_STYLE
+    bg_color = _read_color(raw.get("bg_color"), DEFAULT_BG_COLOR)
+    border_color = _read_color(raw.get("border_color"), DEFAULT_BORDER_COLOR)
 
     return {
         "version": raw.get("version", VERSION),
@@ -180,6 +198,9 @@ def load_ggp(path) -> dict:
         "note_grid": grid.to_list(),
         "mark_color": mark_color,
         "chord_color": chord_color,
+        "grid_style": grid_style,
+        "bg_color": bg_color,
+        "border_color": border_color,
     }
 
 

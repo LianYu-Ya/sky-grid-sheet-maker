@@ -1469,6 +1469,36 @@ def main() -> int:
               gs.style == "thick_frame" and gs.bg_color == "#FFFFFF"
               and gs.border_color == "#333333")
 
+        # ---------------- T32d: 样式字段往返保存 ----------------
+        p_style = tmp / "Style.ggp"
+        save_ggp(str(p_style), "Style", 4, NoteGrid(2),
+                 mark_color="#123456", chord_color="#ABCDEF",
+                 style="full_frame", bg_color="#FFF8E1",
+                 border_color="#333333")
+        loaded = load_ggp(str(p_style))
+        check("T32d 样式/颜色字段往返保存一致",
+              loaded["grid_style"] == "full_frame"
+              and loaded["bg_color"] == "#FFF8E1"
+              and loaded["border_color"] == "#333333"
+              and loaded["mark_color"] == "#123456"
+              and loaded["chord_color"] == "#ABCDEF")
+        p_old = tmp / "Old.ggp"
+        save_ggp(str(p_old), "Old", 4, NoteGrid())
+        old_loaded = load_ggp(str(p_old))
+        check("T32e 未传样式时回退默认",
+              old_loaded["grid_style"] == "default"
+              and old_loaded["bg_color"] == "#FFFFFF"
+              and old_loaded["border_color"] == "#B8B8B8")
+        p_bad = tmp / "Bad.ggp"
+        p_bad.write_text('{"version":2,"note_grid":[[{"k":"Y","c":false}]],'
+                         '"grid_style":"nope","bg_color":"zz","border_color":"#12345"}',
+                         encoding="utf-8")
+        bad_loaded = load_ggp(str(p_bad))
+        check("T32f 非法样式/颜色回退默认",
+              bad_loaded["grid_style"] == "default"
+              and bad_loaded["bg_color"] == "#FFFFFF"
+              and bad_loaded["border_color"] == "#B8B8B8")
+
         window.close()   # closeEvent：dirty=True → question 已注入 Yes → 放行
 
         # ---------------- 汇总 ----------------

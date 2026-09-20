@@ -1543,13 +1543,21 @@ def main() -> int:
         # ---------------- T32l: 导出对话框临时样式 ----------------
         ed = dlg.ExportDialog(NoteGrid(2), 4, default_title="Temp",
                               style="default")
+        key0 = ed._full_pixmap.cacheKey()
         ed.style_combo.setCurrentIndex(ed.style_combo.findData("thick_frame"))
+        key1 = ed._full_pixmap.cacheKey()
         ed._bg_color = "#FFEEDD"
         check("T32l 导出对话框样式读取为临时值",
               ed.style() == "thick_frame" and ed.bg_color() == "#FFEEDD")
         check("T32m 导出临时样式不影响乐谱保存值",
               window.sheet.style() == "full_frame"
               and window._style == "full_frame")
+        check("T32p 导出预览切换样式实时刷新",
+              key1 != key0, f"key0={key0} key1={key1}")
+        check("T32q 颜色按钮文字自动对比色（浅色底深字、深色底白字）",
+              "#333333" in ed.bg_btn.styleSheet()
+              and "#FFFFFF" in ed.mark_btn.styleSheet(),
+              ed.bg_btn.styleSheet())
         ed.close()
 
         # ---------------- T32n: 连续贯通格线（非默认样式） ----------------

@@ -43,6 +43,19 @@ def prompt_title(parent, initial: str = "") -> str:
     return ""
 
 
+def _contrast_text_color(hex_color: str) -> str:
+    """按背景色亮度返回可读文字色：浅底深字、深底白字。"""
+    c = QColor(hex_color)
+    lum = (0.299 * c.red() + 0.587 * c.green() + 0.114 * c.blue()) / 255.0
+    return "#333333" if lum > 0.55 else "#FFFFFF"
+
+
+def _color_button_style(hex_color: str) -> str:
+    """颜色按钮样式：颜色作底色、文字取自动对比色、加细边框保证浅色可见。"""
+    return (f"background-color: {hex_color}; color: {_contrast_text_color(hex_color)};"
+            f" border: 1px solid #B0B0B0; border-radius: 4px; font-weight: bold;")
+
+
 class StyleColorsDialog(QDialog):
     """样式颜色设置：旋律/和弦/背景/边框 四色，改动实时作用于显示区。
 
@@ -82,10 +95,9 @@ class StyleColorsDialog(QDialog):
     # ---------- 内部 ----------
 
     def _refresh(self):
-        """用当前样式颜色给按钮着色（文字即色标）。"""
+        """用当前颜色作按钮底色，文字取自动对比色（浅底深字、深底白字）。"""
         for attr, btn in self._buttons.items():
-            color = getattr(self._style, attr)
-            btn.setStyleSheet(f"color: {color}; font-weight: bold;")
+            btn.setStyleSheet(_color_button_style(getattr(self._style, attr)))
 
     def _pick(self, attr: str):
         color = QColorDialog.getColor(QColor(getattr(self._style, attr)),
@@ -349,6 +361,8 @@ class ExportDialog(QDialog):
         style_row = QHBoxLayout()
         style_row.addWidget(QLabel("格子样式"))
         self.style_combo = QComboBox()
+        self.style_combo.setSizeAdjustPolicy(
+            QComboBox.SizeAdjustPolicy.AdjustToContents)   # 始终完全展开显示当前样式
         for value, label in STYLE_OPTIONS:
             self.style_combo.addItem(label, value)
         self.style_combo.setCurrentIndex(
@@ -430,7 +444,7 @@ class ExportDialog(QDialog):
         img = render_page_image(self._grid, cols, rows,
                                 self.page_spin.value() - 1,
                                 self._mark_color, self._chord_color, title,
-                                style=self._style, bg_color=self._bg_color,
+                                style=self.style(), bg_color=self._bg_color,
                                 border_color=self._border_color)
         self._full_pixmap = QPixmap.fromImage(img)
         self._apply_preview_scale()
@@ -491,14 +505,12 @@ class ExportDialog(QDialog):
             self._refresh()
 
     def _sync_color_buttons(self):
-        """用当前标记颜色给颜色按钮着色（文字即色标）。"""
-        self.mark_btn.setStyleSheet(
-            f"color: {self._mark_color}; font-weight: bold;")
-        self.chord_btn.setStyleSheet(
-            f"color: {self._chord_color}; font-weight: bold;")
-        self.bg_btn.setStyleSheet(f"color: {self._bg_color}; font-weight: bold;")
-        self.border_btn.setStyleSheet(
-            f"color: {self._border_color}; font-weight: bold;")
+        """用当前颜色作按钮底色，文字取自动对比色（浅底深字、深底白字）。"""
+        for btn, color in ((self.mark_btn, self._mark_color),
+                           (self.chord_btn, self._chord_color),
+                           (self.bg_btn, self._bg_color),
+                           (self.border_btn, self._border_color)):
+            btn.setStyleSheet(_color_button_style(color))
 
     # ---------- 对外取值 ----------
 

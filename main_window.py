@@ -83,6 +83,8 @@ class MainWindow(QMainWindow):
 
         self.toolbar.addWidget(QLabel("格子样式"))
         self.style_combo = QComboBox()
+        self.style_combo.setSizeAdjustPolicy(
+            QComboBox.SizeAdjustPolicy.AdjustToContents)   # 始终完全展开显示当前样式
         for value, label in STYLE_OPTIONS:
             self.style_combo.addItem(label, value)
         self.style_combo.setToolTip("格子谱样式：边框形态（默认/完整内外边框/无外边框/无边框纯色块/粗内线/粗内线+外框）")

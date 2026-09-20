@@ -18,6 +18,10 @@ from PySide6.QtGui import QFont, QImage, QColor, QPainter, QPen
 from model import (
     DEFAULT_CHORD_COLOR, DEFAULT_MARK_COLOR, KEYS, ROWS, NoteGrid,
 )
+from grid_style import (
+    DEFAULT_BG_COLOR, DEFAULT_BORDER_COLOR,
+    draws_inner_lines, draws_outer_frame, inner_pen_width,
+)
 
 # ---- 视觉配色（与格子谱显示区统一） ----
 COLOR_BG = QColor("#FFFFFF")           # 背景纯白
@@ -64,7 +68,10 @@ def _draw_title(painter: QPainter, title: str, width: int):
 def render_sheet_image(grid: NoteGrid, columns_per_line: int,
                        mark_color: str | None = None,
                        chord_color: str | None = None,
-                       title: str | None = None) -> QImage:
+                       title: str | None = None,
+                       style: str | None = None,
+                       bg_color: str | None = None,
+                       border_color: str | None = None) -> QImage:
     """渲染整份乐谱为白色背景 QImage（长图），返回 QImage。
 
     等价于"每页 = 全部行"的单页渲染；mark_color / chord_color 为 #RRGGBB
@@ -74,7 +81,8 @@ def render_sheet_image(grid: NoteGrid, columns_per_line: int,
     cols_per_line = max(1, int(columns_per_line))
     total_lines = _num_lines(grid.num_columns(), cols_per_line)
     return render_page_image(grid, cols_per_line, total_lines, 0,
-                             mark_color, chord_color, title)
+                             mark_color, chord_color, title,
+                             style, bg_color, border_color)
 
 
 def num_pages(num_columns: int, columns_per_line: int, rows_per_page: int) -> int:
@@ -89,7 +97,10 @@ def render_page_image(grid: NoteGrid, columns_per_line: int, rows_per_page: int,
                       page_index: int,
                       mark_color: str | None = None,
                       chord_color: str | None = None,
-                      title: str | None = None) -> QImage:
+                      title: str | None = None,
+                      style: str | None = None,
+                      bg_color: str | None = None,
+                      border_color: str | None = None) -> QImage:
     """渲染第 page_index 页（每页 rows_per_page 行 × columns_per_line 列块）。
 
     页码越界时渲染空页（1 行空网格）保证图片高度有效；
@@ -106,13 +117,15 @@ def render_page_image(grid: NoteGrid, columns_per_line: int, rows_per_page: int,
 
     mark_qcolor = _valid_qcolor(mark_color, DEFAULT_MARK_COLOR)
     chord_qcolor = _valid_qcolor(chord_color, DEFAULT_CHORD_COLOR)
+    bg_qcolor = _valid_qcolor(bg_color, DEFAULT_BG_COLOR)
+    border_qcolor = _valid_qcolor(border_color, DEFAULT_BORDER_COLOR)
 
     title_h = TITLE_H if title else 0
     width = MARGIN * 2 + cols_per_line * BLOCK_W + (cols_per_line - 1) * BLOCK_GAP
     height = MARGIN * 2 + title_h + lines * BLOCK_H + (lines - 1) * LINE_GAP
 
     image = QImage(width, height, QImage.Format_ARGB32)
-    image.fill(COLOR_BG)
+    image.fill(bg_qcolor)
 
     painter = QPainter(image)
     if title:
@@ -120,7 +133,8 @@ def render_page_image(grid: NoteGrid, columns_per_line: int, rows_per_page: int,
         _draw_title(painter, title, width)
         painter.setRenderHint(QPainter.Antialiasing, False)
     _draw_sheet(painter, grid, cols_per_line, first_line, lines,
-                mark_qcolor, chord_qcolor, title_h)
+                mark_qcolor, chord_qcolor, title_h,
+                style, bg_qcolor, border_qcolor)
     painter.end()
     return image
 
@@ -130,7 +144,10 @@ def export_pages(path_base: str, grid: NoteGrid, columns_per_line: int,
                  mark_color: str | None = None,
                  chord_color: str | None = None,
                  title: str | None = None,
-                 draw_title: bool = True) -> tuple[bool, int]:
+                 draw_title: bool = True,
+                 style: str | None = None,
+                 bg_color: str | None = None,
+                 border_color: str | None = None) -> tuple[bool, int]:
     """分页导出 PNG：多页文件名 path_base_1.png / path_base_2.png…，单页 path_base.png。
 
     draw_title=False 时不绘制乐谱名；title 仅作显示名（与文件名分离）。
@@ -143,7 +160,8 @@ def export_pages(path_base: str, grid: NoteGrid, columns_per_line: int,
         try:
             img = render_page_image(grid, columns_per_line, rows_per_page, p,
                                     mark_color, chord_color,
-                                    title if draw_title else None)
+                                    title if draw_title else None,
+                                    style, bg_color, border_color)
             ok_all = img.save(path, "PNG") and ok_all
         except Exception:
             ok_all = False
@@ -153,9 +171,21 @@ def export_pages(path_base: str, grid: NoteGrid, columns_per_line: int,
 def _draw_sheet(painter: QPainter, grid: NoteGrid, cols_per_line: int,
                 first_line: int, num_lines: int,
                 mark_qcolor: QColor, chord_qcolor: QColor,
-                title_h: int = 0):
+                title_h: int = 0,
+                style: str | None = None,
+                bg_qcolor: QColor | None = None,
+                border_qcolor: QColor | None = None):
     """绘制乐谱网格中从 first_line 起的 num_lines 行：每行 cols_per_line 个 3×5 块，
-    主旋律/和弦格分别填色（不画字母、不画光标）。"""
+    主旋律/和弦格分别填色（不画字母、不画光标）。
+    按样式画内线/外框，线宽粗细跟随样式。"""
+    if bg_qcolor is None:
+        bg_qcolor = COLOR_BG
+    if border_qcolor is None:
+        border_qcolor = COLOR_CELL_BORDER
+    style = style or "default"
+    pen_width = inner_pen_width(style)
+    if draws_inner_lines(style):
+        painter.setPen(QPen(border_qcolor, pen_width))
     block_y0 = MARGIN + title_h
     num_columns = grid.num_columns()
     cell_step = MINI + MINI_GAP
@@ -173,27 +203,36 @@ def _draw_sheet(painter: QPainter, grid: NoteGrid, cols_per_line: int,
                     key = KEYS[r * 5 + c]
 
                     # 小格：空 = 白底加深灰边框；和弦格填和弦色；主旋律格填旋律色
-                    painter.setPen(QPen(COLOR_CELL_BORDER, 1))
                     if beat < num_columns:
                         if grid.is_chord(beat, key):
                             painter.setBrush(chord_qcolor)
                         elif grid.has_note(beat, key):
                             painter.setBrush(mark_qcolor)
                         else:
-                            painter.setBrush(COLOR_BG)
+                            painter.setBrush(bg_qcolor)
                     else:
-                        painter.setBrush(COLOR_BG)
-                    painter.drawRect(x, y, MINI, MINI)
+                        painter.setBrush(bg_qcolor)
+                    if draws_inner_lines(style):
+                        painter.drawRect(x, y, MINI, MINI)
+
+            # 外框：包住整个 3×5 节拍块（线宽与内线一致）
+            if draws_outer_frame(style):
+                painter.setPen(QPen(border_qcolor, pen_width))
+                painter.drawRect(bx, block_y, BLOCK_W, BLOCK_H)
 
 
 def export_png(path: str, grid: NoteGrid, columns_per_line: int,
                mark_color: str | None = None,
                chord_color: str | None = None,
-               title: str | None = None) -> bool:
+               title: str | None = None,
+               style: str | None = None,
+               bg_color: str | None = None,
+               border_color: str | None = None) -> bool:
     """调 render_sheet_image 并保存为 PNG；成功返回 True，异常/失败返回 False。"""
     try:
         image = render_sheet_image(grid, columns_per_line,
-                                   mark_color, chord_color, title)
+                                   mark_color, chord_color, title,
+                                   style, bg_color, border_color)
         return image.save(path, "PNG")
     except Exception:
         return False

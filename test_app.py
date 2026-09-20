@@ -79,6 +79,7 @@ from export import (MARGIN as EXPORT_MARGIN, MINI as EXPORT_MINI,
                     BLOCK_GAP as EXPORT_BLOCK_GAP,
                     LINE_GAP as EXPORT_LINE_GAP,
                     TITLE_H as EXPORT_TITLE_H)
+from export import MINI as EX_MINI, MARGIN as EX_M
 
 RESULTS: list[tuple[str, bool]] = []
 
@@ -1507,6 +1508,23 @@ def main() -> int:
               sheet.style() == "no_border"
               and sheet.bg_color().name() == "#fff8e1"
               and sheet.border_color().name() == "#333333")
+
+        # ---------------- T32h: 导出样式渲染（固定 MINI=36） ----------------
+        g1 = NoteGrid(1)
+        g1.set_note(0, "Y", False, True)
+        img_def = render_page_image(g1, 4, 1, 0)          # 默认样式
+        px_def_border = img_def.pixelColor(EX_M, EX_M + 2).name()   # 首格左边框线
+        img_nb = render_page_image(g1, 4, 1, 0, style="no_border",
+                                   bg_color="#FFF8E1")
+        px_nb = img_nb.pixelColor(EX_M, EX_M + 2).name()
+        check("T32h 默认导出有内线、no_border 无内线且背景生效",
+              px_def_border == "#b8b8b8" and px_nb == "#fff8e1",
+              f"def={px_def_border} nb={px_nb}")
+        img_ff = render_page_image(g1, 4, 1, 0, style="full_frame",
+                                   border_color="#333333")
+        px_frame = img_ff.pixelColor(EX_M, EX_M).name()   # 块外框左上角
+        check("T32i 完整内外边框导出画外框（自定义边框色）",
+              px_frame == "#333333", f"frame={px_frame}")
 
         window.close()   # closeEvent：dirty=True → question 已注入 Yes → 放行
 

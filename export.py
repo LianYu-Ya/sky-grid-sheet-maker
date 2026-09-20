@@ -21,6 +21,7 @@ from model import (
 from grid_style import (
     DEFAULT_BG_COLOR, DEFAULT_BORDER_COLOR,
     draws_inner_lines, draws_outer_frame, inner_pen_width,
+    uses_continuous_lines,
 )
 
 # ---- 视觉配色（与格子谱显示区统一） ----
@@ -184,8 +185,6 @@ def _draw_sheet(painter: QPainter, grid: NoteGrid, cols_per_line: int,
         border_qcolor = COLOR_CELL_BORDER
     style = style or "default"
     pen_width = inner_pen_width(style)
-    if draws_inner_lines(style):
-        painter.setPen(QPen(border_qcolor, pen_width))
     block_y0 = MARGIN + title_h
     num_columns = grid.num_columns()
     cell_step = MINI + MINI_GAP
@@ -196,24 +195,40 @@ def _draw_sheet(painter: QPainter, grid: NoteGrid, cols_per_line: int,
         for j in range(cols_per_line):
             beat = line * cols_per_line + j
             bx = MARGIN + j * (BLOCK_W + BLOCK_GAP)
+
+            # 小格填充：空 = 底色；和弦格填和弦色；主旋律格填旋律色
             for r in range(ROWS):
                 for c in range(5):
                     x = bx + c * cell_step
                     y = block_y + r * cell_step
                     key = KEYS[r * 5 + c]
-
-                    # 小格：空 = 白底加深灰边框；和弦格填和弦色；主旋律格填旋律色
                     if beat < num_columns:
                         if grid.is_chord(beat, key):
-                            painter.setBrush(chord_qcolor)
+                            painter.fillRect(x, y, MINI, MINI, chord_qcolor)
                         elif grid.has_note(beat, key):
-                            painter.setBrush(mark_qcolor)
+                            painter.fillRect(x, y, MINI, MINI, mark_qcolor)
                         else:
-                            painter.setBrush(bg_qcolor)
+                            painter.fillRect(x, y, MINI, MINI, bg_qcolor)
                     else:
-                        painter.setBrush(bg_qcolor)
-                    if draws_inner_lines(style):
-                        painter.drawRect(x, y, MINI, MINI)
+                        painter.fillRect(x, y, MINI, MINI, bg_qcolor)
+
+            if not draws_inner_lines(style):
+                continue
+            painter.setPen(QPen(border_qcolor, pen_width))
+            if uses_continuous_lines(style):
+                # 非默认样式：行间/列间格线画成完整线段（线宽均匀、交点不叠加）
+                for k in range(1, ROWS):
+                    painter.drawLine(bx, block_y + k * cell_step,
+                                     bx + BLOCK_W, block_y + k * cell_step)
+                for k in range(1, 5):
+                    painter.drawLine(bx + k * cell_step, block_y,
+                                     bx + k * cell_step, block_y + BLOCK_H)
+            else:
+                # 默认样式：逐格边框（维持原视觉）
+                for r in range(ROWS):
+                    for c in range(5):
+                        painter.drawRect(bx + c * cell_step, block_y + r * cell_step,
+                                         MINI, MINI)
 
             # 外框：包住整个 3×5 节拍块（线宽与内线一致）
             if draws_outer_frame(style):

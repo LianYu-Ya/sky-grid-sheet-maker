@@ -64,6 +64,15 @@ def inner_pen_width(style: str) -> int:
     return THICK_PEN if style in ("thick_inner", "thick_frame") else THIN_PEN
 
 
+def uses_continuous_lines(style: str) -> bool:
+    """非默认、非无边框样式：内部格线用连续贯通画法。
+
+    连续画法把行间/列间的格线画成完整线段，线宽均匀、交点不叠加变粗；
+    默认样式保留逐格边框画法（维持原视觉），无边框样式不画线。
+    """
+    return style in ("full_frame", "no_outer", "thick_inner", "thick_frame")
+
+
 def _coerce_style(style) -> str:
     return style if is_valid_style(style) else DEFAULT_STYLE
 

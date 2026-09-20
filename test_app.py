@@ -1513,13 +1513,17 @@ def main() -> int:
         g1 = NoteGrid(1)
         g1.set_note(0, "Y", False, True)
         img_def = render_page_image(g1, 4, 1, 0)          # 默认样式
-        px_def_border = img_def.pixelColor(EX_M, EX_M + 2).name()   # 首格左边框线
+        px_def_border = img_def.pixelColor(EX_M, EX_M + EX_MINI // 2).name()
         img_nb = render_page_image(g1, 4, 1, 0, style="no_border",
                                    bg_color="#FFF8E1")
-        px_nb = img_nb.pixelColor(EX_M, EX_M + 2).name()
+        px_nb = img_nb.pixelColor(EX_M, EX_M + EX_MINI // 2).name()
+        px_nb_bg = img_nb.pixelColor(
+            EX_M + EX_MINI + EXPORT_MINI_GAP + EX_MINI // 2,
+            EX_M + EX_MINI // 2).name()                    # 第2列空格内部
         check("T32h 默认导出有内线、no_border 无内线且背景生效",
-              px_def_border == "#b8b8b8" and px_nb == "#fff8e1",
-              f"def={px_def_border} nb={px_nb}")
+              px_def_border == "#b8b8b8" and px_nb == "#e84848"
+              and px_nb_bg == "#fff8e1",
+              f"def={px_def_border} nb={px_nb} bg={px_nb_bg}")
         img_ff = render_page_image(g1, 4, 1, 0, style="full_frame",
                                    border_color="#333333")
         px_frame = img_ff.pixelColor(EX_M, EX_M).name()   # 块外框左上角
@@ -1547,6 +1551,23 @@ def main() -> int:
               window.sheet.style() == "full_frame"
               and window._style == "full_frame")
         ed.close()
+
+        # ---------------- T32n: 连续贯通格线（非默认样式） ----------------
+        img_no = render_page_image(g1, 4, 1, 0, style="no_outer")
+        x_mid = EX_M + EX_MINI + EXPORT_MINI_GAP + EX_MINI // 2   # 第2列空格内部
+        px_top = img_no.pixelColor(x_mid, EX_M).name()            # 块顶边：无外框
+        px_inner = img_no.pixelColor(
+            x_mid, EX_M + EX_MINI + EXPORT_MINI_GAP).name()       # 行间内线
+        check("T32n no_outer：无外框边、内部线连续贯通",
+              px_top == "#ffffff" and px_inner == "#b8b8b8",
+              f"top={px_top} inner={px_inner}")
+        img_ti = render_page_image(g1, 4, 1, 0, style="thick_inner")
+        lx = EX_M + EX_MINI + EXPORT_MINI_GAP    # 第1列与第2列之间竖线
+        ly = EX_M + EX_MINI // 2             # 内线中段（避开行间线交点）
+        cnt = sum(1 for dx in range(-3, 4)
+                  if img_ti.pixelColor(lx + dx, ly).name() == "#b8b8b8")
+        check("T32o thick_inner 内线 2px 连续（交点不叠加变粗）",
+              1 <= cnt <= 2, f"cnt={cnt}")
 
         window.close()   # closeEvent：dirty=True → question 已注入 Yes → 放行
 

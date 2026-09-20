@@ -40,6 +40,7 @@ from model import (
 from grid_style import (
     DEFAULT_BG_COLOR, DEFAULT_BORDER_COLOR, DEFAULT_STYLE,
     draws_inner_lines, draws_outer_frame, inner_pen_width, is_valid_style,
+    uses_continuous_lines,
 )
 
 # ---------- 简约白色主题配色 ----------
@@ -534,10 +535,8 @@ class SheetWidget(QWidget):
         n_lines = max(2, len(lines))   # 默认至少绘制两横排（第二行不足时为空网格）
 
         # 1) 逐行逐块绘制 3×5 小格：空格用背景色填充，
-        #    主旋律格填旋律色、和弦格填和弦色；按样式画内线（no_border 不画）
+        #    主旋律格填旋律色、和弦格填和弦色
         pen_width = inner_pen_width(self._style)
-        if draws_inner_lines(self._style):
-            painter.setPen(QPen(self._border_color, pen_width))
         for line_i in range(n_lines):
             for j in range(cpl):
                 col = line_i * cpl + j
@@ -551,8 +550,25 @@ class SheetWidget(QWidget):
                             painter.fillRect(rect, self._mark_color)
                         else:
                             painter.fillRect(rect, self._bg_color)
-                        if draws_inner_lines(self._style):
-                            painter.drawRect(rect)
+                if not draws_inner_lines(self._style):
+                    continue
+                painter.setPen(QPen(self._border_color, pen_width))
+                if uses_continuous_lines(self._style):
+                    # 非默认样式：行间/列间格线画成完整线段（线宽均匀、交点不叠加）
+                    bx = MARGIN_X + j * (self._block_w() + BLOCK_GAP)
+                    by = MARGIN_Y + line_i * (self._block_h() + LINE_GAP)
+                    step = self._mini + MINI_GAP
+                    bw = self._block_w()
+                    bh = self._block_h()
+                    for k in range(1, ROWS):       # 行间水平线
+                        painter.drawLine(bx, by + k * step, bx + bw, by + k * step)
+                    for k in range(1, 5):          # 列间竖直线
+                        painter.drawLine(bx + k * step, by, bx + k * step, by + bh)
+                else:
+                    # 默认样式：逐格边框（维持原视觉）
+                    for r in range(ROWS):
+                        for c in range(5):
+                            painter.drawRect(self._cell_rect(line_i, r, j, c))
 
         # 1.5) 完整内外边框 / 粗内线+外框：每个节拍块画外框（线宽与内线一致）
         if draws_outer_frame(self._style):

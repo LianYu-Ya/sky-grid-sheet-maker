@@ -1526,6 +1526,16 @@ def main() -> int:
         check("T32i 完整内外边框导出画外框（自定义边框色）",
               px_frame == "#333333", f"frame={px_frame}")
 
+        # ---------------- T32j: 工具栏样式下拉框联动 ----------------
+        combo = window.style_combo
+        check("T32j 工具栏含 6 项样式下拉框且联动显示区",
+              combo.count() == 6)
+        idx = combo.findData("full_frame")
+        combo.setCurrentIndex(idx)
+        QTest.qWait(10)
+        check("T32k 切换下拉框实时生效",
+              window.sheet.style() == "full_frame" and window._style == "full_frame")
+
         window.close()   # closeEvent：dirty=True → question 已注入 Yes → 放行
 
         # ---------------- 汇总 ----------------

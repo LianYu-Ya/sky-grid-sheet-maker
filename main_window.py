@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
     QButtonGroup,
     QCheckBox,
     QColorDialog,
+    QComboBox,
     QDialog,
     QDockWidget,
     QLabel,
@@ -27,6 +28,8 @@ from PySide6.QtWidgets import (
 )
 
 from model import NoteGrid
+from grid_style import (DEFAULT_BORDER_COLOR, DEFAULT_BG_COLOR, DEFAULT_STYLE,
+                        STYLE_OPTIONS, is_valid_style)
 from file_io import default_data_dir, default_output_dir, load_ggp, save_ggp
 from dialogs import BrowseSheetsDialog, ExportDialog, prompt_title
 from sheet_widget import LINE_GAP, MARGIN_Y, SheetWidget
@@ -49,6 +52,9 @@ class MainWindow(QMainWindow):
         self._current_path: str | None = None
         self._mark_color: str | None = None    # None=使用默认旋律色
         self._chord_color: str | None = None   # None=使用默认和弦色
+        self._style: str = DEFAULT_STYLE                 # 格子样式
+        self._bg_color: str | None = None                # None=默认背景色
+        self._border_color: str | None = None            # None=默认边框色
 
         # ---------- 顶部工具栏 ----------
         self.toolbar = QToolBar("工具栏", self)
@@ -74,6 +80,14 @@ class MainWindow(QMainWindow):
         chord_color_btn = QPushButton("和弦颜色")
         chord_color_btn.clicked.connect(self.choose_chord_color)
         self.toolbar.addWidget(chord_color_btn)
+
+        self.toolbar.addWidget(QLabel("格子样式"))
+        self.style_combo = QComboBox()
+        for value, label in STYLE_OPTIONS:
+            self.style_combo.addItem(label, value)
+        self.style_combo.setToolTip("格子谱样式：边框形态（默认/完整内外边框/无外边框/无边框纯色块/粗内线/粗内线+外框）")
+        self.style_combo.currentIndexChanged.connect(self._on_style_changed)
+        self.toolbar.addWidget(self.style_combo)
 
         self.toolbar.addSeparator()
 
@@ -434,7 +448,9 @@ class MainWindow(QMainWindow):
                 return
 
         save_ggp(path, title, self.sheet.columns_per_line(), self._model,
-                 mark_color=self._mark_color, chord_color=self._chord_color)
+                 mark_color=self._mark_color, chord_color=self._chord_color,
+                 style=self._style, bg_color=self._bg_color,
+                 border_color=self._border_color)
         self._current_path = path
         self._dirty = False
         self._update_title()
@@ -485,6 +501,24 @@ class MainWindow(QMainWindow):
             self._chord_color = data["chord_color"]
             self.sheet.set_chord_color(QColor(data["chord_color"]))
 
+        # 恢复格子样式与背景/边框色（文件带字段时）
+        style = data.get("grid_style")
+        self._style = style if is_valid_style(style) else DEFAULT_STYLE
+        self.sheet.set_style(self._style)
+        idx = self.style_combo.findData(self._style)
+        if idx >= 0:
+            self.style_combo.blockSignals(True)
+            self.style_combo.setCurrentIndex(idx)
+            self.style_combo.blockSignals(False)
+        self._bg_color = (data.get("bg_color")
+                          if data.get("bg_color") != DEFAULT_BG_COLOR else None)
+        self._border_color = (data.get("border_color")
+                              if data.get("border_color") != DEFAULT_BORDER_COLOR
+                              else None)
+        self.sheet.set_bg_color(QColor(data.get("bg_color") or DEFAULT_BG_COLOR))
+        self.sheet.set_border_color(
+            QColor(data.get("border_color") or DEFAULT_BORDER_COLOR))
+
         self.sheet.set_cursor(0)
         self._current_path = path
         self._dirty = False
@@ -513,6 +547,16 @@ class MainWindow(QMainWindow):
         self._chord_color = color.name()
         self.sheet.set_chord_color(color)
         self.statusBar().showMessage(f"和弦颜色已更换：{self._chord_color}", 3000)
+
+    def _on_style_changed(self, *_):
+        """下拉框切换样式：同步显示区并置脏。"""
+        value = self.style_combo.currentData()
+        style = value if is_valid_style(value) else DEFAULT_STYLE
+        if style != self._style:
+            self._style = style
+            self.sheet.set_style(style)
+            self._mark_dirty()
+            self.statusBar().showMessage(f"格子样式已切换：{style}", 3000)
 
     # ---------- 动作：导出 PNG ----------
 

@@ -23,6 +23,7 @@ import json
 import os
 import pathlib
 import shutil
+import sys
 import datetime
 import re
 
@@ -42,11 +43,30 @@ def _now_iso() -> str:
     return datetime.datetime.now().isoformat(timespec="seconds")
 
 
+def app_base_dir() -> pathlib.Path:
+    """应用根目录。
+
+    源码运行时为文件所在目录；PyInstaller 打包后 sys.frozen 为 True，
+    __file__ 会指向 _MEIxxxx 临时解压目录，必须改用 exe 所在目录，
+    否则 sheets / outputs 会被写到临时目录而丢失。
+    """
+    if getattr(sys, "frozen", False):
+        return pathlib.Path(sys.executable).resolve().parent
+    return pathlib.Path(__file__).resolve().parent
+
+
 def default_data_dir() -> pathlib.Path:
     """返回默认数据目录：应用文件夹下的"乐谱"子目录（保存 .ggp），不存在则创建。"""
-    data_dir = pathlib.Path(__file__).resolve().parent / SHEETS_DIR_NAME
+    data_dir = app_base_dir() / SHEETS_DIR_NAME
     data_dir.mkdir(parents=True, exist_ok=True)
     return data_dir
+
+
+def default_output_dir() -> pathlib.Path:
+    """返回默认导出目录：应用文件夹下的 outputs，不存在则创建。"""
+    out_dir = app_base_dir() / "outputs"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    return out_dir
 
 
 def save_ggp(path, title: str, columns_per_line: int, grid: NoteGrid,

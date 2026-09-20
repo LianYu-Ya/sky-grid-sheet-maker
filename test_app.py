@@ -174,7 +174,7 @@ def main() -> int:
         mock.patch.object(mw.QMessageBox, "warning"),
         mock.patch.object(dlg.ExportDialog, "exec", return_value=QDialog.Accepted),
         mock.patch.object(mw, "default_data_dir", return_value=tmp),
-        mock.patch.object(mw.os, "getcwd", return_value=str(tmp)),   # 默认导出目录 → tmp/outputs
+        mock.patch.object(mw, "default_output_dir", return_value=tmp / "outputs"),  # 默认导出目录 → tmp/outputs
         mock.patch.object(mw.QDesktopServices, "openUrl"),
     ):
         window = MainWindow()

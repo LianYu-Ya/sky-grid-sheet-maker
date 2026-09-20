@@ -27,7 +27,7 @@ from PySide6.QtWidgets import (
 )
 
 from model import NoteGrid
-from file_io import default_data_dir, load_ggp, save_ggp
+from file_io import default_data_dir, default_output_dir, load_ggp, save_ggp
 from dialogs import BrowseSheetsDialog, ExportDialog, prompt_title
 from sheet_widget import LINE_GAP, MARGIN_Y, SheetWidget
 from key_panel import (
@@ -372,8 +372,7 @@ class MainWindow(QMainWindow):
 
     def open_output_folder(self):
         """打开默认导出目录（应用目录下的 outputs），不存在则先创建。"""
-        out_dir = os.path.join(os.getcwd(), "outputs")
-        os.makedirs(out_dir, exist_ok=True)
+        out_dir = str(default_output_dir())
         QDesktopServices.openUrl(QUrl.fromLocalFile(out_dir))
         self.statusBar().showMessage(f"已打开输出文件夹：{out_dir}", 3000)
 
@@ -525,7 +524,7 @@ class MainWindow(QMainWindow):
             default_title=self.title_edit.text().strip(),
             mark_color=self.sheet.mark_color().name(),
             chord_color=self.sheet.chord_color().name(),
-            default_dir=os.path.join(os.getcwd(), "outputs"),
+            default_dir=str(default_output_dir()),
             parent=self)
         if dlg.exec() != QDialog.Accepted:
             return

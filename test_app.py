@@ -47,8 +47,8 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from PySide6.QtCore import QPoint, QEvent, QPointF, Qt
-from PySide6.QtGui import QColor, QImage, QMouseEvent
+from PySide6.QtCore import QPoint, Qt
+from PySide6.QtGui import QColor, QImage
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import (
     QApplication, QDialog, QMessageBox, QPushButton, QSpinBox, QSplitter,
@@ -1559,22 +1559,6 @@ def main() -> int:
               and "#FFFFFF" in ed.mark_btn.styleSheet(),
               ed.bg_btn.styleSheet())
         ed.close()
-
-        # ---------------- T32r: 粘滞下拉框（展开保持、再点收起） ----------------
-        from dialogs import StickyComboBox
-        scb = StickyComboBox()
-        for _value, _label in STYLE_OPTIONS:
-            scb.addItem(_label, _value)
-        with mock.patch.object(scb.view(), "isVisible", return_value=True):
-            scb._stick = True
-            scb.hidePopup()                  # 选择项/鼠标移开 → 不收起
-            check("T32r 粘滞下拉框：展开后选择/移开不收起",
-                  scb._stick)
-            ev = QMouseEvent(QEvent.MouseButtonPress, QPointF(5, 5),
-                             Qt.LeftButton, Qt.LeftButton, Qt.NoModifier)
-            scb.mousePressEvent(ev)          # 再次点击 → 收起
-            check("T32s 粘滞下拉框：再次点击收起", not scb._stick)
-        scb.close()
 
         # ---------------- T32t: 工具栏可换行不收起 ----------------
         from main_window import ToolbarFlow

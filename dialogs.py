@@ -51,41 +51,15 @@ def _contrast_text_color(hex_color: str) -> str:
 
 
 def _color_button_style(hex_color: str) -> str:
-    """颜色按钮样式：颜色作底色、文字取自动对比色、加细边框保证浅色可见。"""
-    return (f"background-color: {hex_color}; color: {_contrast_text_color(hex_color)};"
-            f" border: 1px solid #B0B0B0; border-radius: 4px; font-weight: bold;")
+    """颜色按钮样式：颜色作底色、文字取自动对比色、加细边框保证浅色可见。
 
-
-class StickyComboBox(QComboBox):
-    """粘滞下拉框：点击展开后保持展开。
-
-    选择选项 / 鼠标移开 / 点击其他位置都不会收起（便于反复对比效果）；
-    再次点击下拉框本身才会收起。API 与 QComboBox 完全兼容。
+    同时覆盖 :hover/:pressed，避免全局样式在悬停时把底色刷成蓝色。
     """
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self._stick = False
-
-    def showPopup(self):
-        """首次点击展开：置粘滞标志，保持展开。"""
-        self._stick = True
-        super().showPopup()
-
-    def hidePopup(self):
-        """拦截自动收起：粘滞期间（选择项/外部点击）保持展开。"""
-        if self._stick and self.view().isVisible():
-            return
-        self._stick = False
-        super().hidePopup()
-
-    def mousePressEvent(self, event):
-        """再次点击已展开的下拉框 → 真正收起；否则走正常展开逻辑。"""
-        if self._stick and self.view().isVisible():
-            self._stick = False
-            self.hidePopup()
-            return
-        super().mousePressEvent(event)
+    text = _contrast_text_color(hex_color)
+    return (f"QPushButton {{ background-color: {hex_color}; color: {text};"
+            f" border: 1px solid #B0B0B0; border-radius: 4px; font-weight: bold; }}"
+            f"QPushButton:hover, QPushButton:pressed {{"
+            f" background-color: {hex_color}; color: {text}; }}")
 
 
 class StyleColorsDialog(QDialog):
@@ -392,9 +366,7 @@ class ExportDialog(QDialog):
         # 格子样式（仅本次导出生效）
         style_row = QHBoxLayout()
         style_row.addWidget(QLabel("格子样式"))
-        self.style_combo = StickyComboBox()
-        self.style_combo.setSizeAdjustPolicy(
-            QComboBox.SizeAdjustPolicy.AdjustToContents)   # 始终完全展开显示当前样式
+        self.style_combo = QComboBox()
         for value, label in STYLE_OPTIONS:
             self.style_combo.addItem(label, value)
         self.style_combo.setCurrentIndex(

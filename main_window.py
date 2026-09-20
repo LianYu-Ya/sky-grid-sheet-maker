@@ -33,7 +33,7 @@ from grid_style import (DEFAULT_BORDER_COLOR, DEFAULT_BG_COLOR, DEFAULT_STYLE,
                         STYLE_OPTIONS, GridStyle, is_valid_style)
 from file_io import default_data_dir, default_output_dir, load_ggp, save_ggp
 from dialogs import (
-    BrowseSheetsDialog, ExportDialog, StickyComboBox, StyleColorsDialog,
+    BrowseSheetsDialog, ExportDialog, StyleColorsDialog,
     prompt_title,
 )
 from sheet_widget import LINE_GAP, MARGIN_Y, SheetWidget
@@ -96,22 +96,35 @@ class FlowLayout(QLayout):
     def _do_layout(self, rect: QRect, test_only: bool) -> int:
         m = self.contentsMargins()
         effective = rect.adjusted(m.left(), m.top(), -m.right(), -m.bottom())
-        x, y = effective.x(), effective.y()
-        line_height = 0
         spacing = self.spacing()
+        # 先按行分组（记录每项在行内的 x 与高度），再逐行垂直居中放置，避免文字歪斜
+        lines: list[tuple[int, int, list]] = []   # (row_y, row_height, [(item, hint, x)])
+        x, y = effective.x(), effective.y()
+        line_items: list = []
+        line_height = 0
         for item in self._items:
             hint = item.sizeHint()
             next_x = x + hint.width() + spacing
-            if next_x - spacing > effective.right() and line_height > 0:
+            if next_x - spacing > effective.right() and line_items:
+                lines.append((y, line_height, line_items))
                 x = effective.x()
                 y += line_height + spacing
-                next_x = x + hint.width() + spacing
+                line_items = []
                 line_height = 0
-            if not test_only:
-                item.setGeometry(QRect(QPoint(x, y), hint))
+                next_x = x + hint.width() + spacing
+            line_items.append((item, hint, x))
             x = next_x
             line_height = max(line_height, hint.height())
-        return y + line_height - rect.y() + m.bottom()
+        if line_items:
+            lines.append((y, line_height, line_items))
+        if not lines:
+            return m.bottom()
+        if not test_only:
+            for row_y, row_h, items in lines:
+                for item, hint, ix in items:
+                    cy = row_y + (row_h - hint.height()) // 2
+                    item.setGeometry(QRect(QPoint(ix, cy), hint))
+        return lines[-1][0] + lines[-1][1] - rect.y() + m.bottom()
 
 
 class ToolbarFlow(QWidget):
@@ -181,9 +194,7 @@ class MainWindow(QMainWindow):
         self.toolbar.addWidget(chord_color_btn)
 
         self.toolbar.addWidget(QLabel("格子样式"))
-        self.style_combo = StickyComboBox()
-        self.style_combo.setSizeAdjustPolicy(
-            QComboBox.SizeAdjustPolicy.AdjustToContents)   # 始终完全展开显示当前样式
+        self.style_combo = QComboBox()
         for value, label in STYLE_OPTIONS:
             self.style_combo.addItem(label, value)
         self.style_combo.setToolTip("格子谱样式：边框形态（默认/完整内外边框/无外边框/无边框纯色块/粗内线/粗内线+外框）")

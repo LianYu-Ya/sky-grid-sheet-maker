@@ -1499,6 +1499,15 @@ def main() -> int:
               and bad_loaded["bg_color"] == "#FFFFFF"
               and bad_loaded["border_color"] == "#B8B8B8")
 
+        # ---------------- T32g: 显示区样式渲染 ----------------
+        sheet.set_style("no_border")
+        sheet.set_bg_color(QColor("#FFF8E1"))
+        sheet.set_border_color(QColor("#333333"))
+        check("T32g 显示区样式 getter/setter 生效",
+              sheet.style() == "no_border"
+              and sheet.bg_color().name() == "#fff8e1"
+              and sheet.border_color().name() == "#333333")
+
         window.close()   # closeEvent：dirty=True → question 已注入 Yes → 放行
 
         # ---------------- 汇总 ----------------

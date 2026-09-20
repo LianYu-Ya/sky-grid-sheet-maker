@@ -37,6 +37,10 @@ from PySide6.QtWidgets import QWidget
 from model import (
     DEFAULT_CHORD_COLOR, DEFAULT_MARK_COLOR, KEYS, KEY_ROWS, ROWS, NoteGrid,
 )
+from grid_style import (
+    DEFAULT_BG_COLOR, DEFAULT_BORDER_COLOR, DEFAULT_STYLE,
+    draws_inner_lines, draws_outer_frame, inner_pen_width, is_valid_style,
+)
 
 # ---------- 简约白色主题配色 ----------
 COLOR_BG = QColor("#FFFFFF")          # 背景纯白
@@ -69,6 +73,9 @@ class SheetWidget(QWidget):
         self._current_key = "J"       # 当前选中键（键位面板同步）
         self._mark_color = QColor(DEFAULT_MARK_COLOR)    # 主旋律标记颜色
         self._chord_color = QColor(DEFAULT_CHORD_COLOR)  # 和弦标记颜色
+        self._bg_color = QColor(DEFAULT_BG_COLOR)       # 背景色
+        self._border_color = QColor(DEFAULT_BORDER_COLOR)  # 格线/外框色
+        self._style = DEFAULT_STYLE                     # 格子样式
         self._mini = MINI_DEFAULT     # 当前小格边长（随宽度自适应）
         self._last_width = -1         # 上次处理过的宽度（防 resize 死循环）
         # R13 自动跳转：开关默认关；阈值默认 800ms；本拍第一个键的时间戳
@@ -252,6 +259,35 @@ class SheetWidget(QWidget):
     def set_chord_color(self, color):
         """设置和弦标记颜色；传入 None 或非法 QColor 时恢复默认色。"""
         self._chord_color = self._coerce_color(color, DEFAULT_CHORD_COLOR)
+        self.update()
+
+    # ---------- 格子样式 ----------
+
+    def style(self) -> str:
+        """当前格子样式枚举值。"""
+        return self._style
+
+    def set_style(self, style):
+        """设置格子样式；非法值回退默认。"""
+        self._style = style if is_valid_style(style) else DEFAULT_STYLE
+        self.update()
+
+    def bg_color(self) -> QColor:
+        """当前背景色。"""
+        return QColor(self._bg_color)
+
+    def set_bg_color(self, color):
+        """设置背景色；None 或非法 QColor 时恢复默认。"""
+        self._bg_color = self._coerce_color(color, DEFAULT_BG_COLOR)
+        self.update()
+
+    def border_color(self) -> QColor:
+        """当前格线/外框颜色。"""
+        return QColor(self._border_color)
+
+    def set_border_color(self, color):
+        """设置格线/外框颜色；None 或非法 QColor 时恢复默认。"""
+        self._border_color = self._coerce_color(color, DEFAULT_BORDER_COLOR)
         self.update()
 
     @staticmethod
@@ -484,7 +520,7 @@ class SheetWidget(QWidget):
 
     def paintEvent(self, event):
         painter = QPainter(self)
-        painter.fillRect(self.rect(), COLOR_BG)
+        painter.fillRect(self.rect(), self._bg_color)
 
         # 绘制前兜底同步小格边长（独立/未显示 widget 也保证与宽度一致）
         self._sync_mini()
@@ -497,9 +533,11 @@ class SheetWidget(QWidget):
         lines = self._lines()
         n_lines = max(2, len(lines))   # 默认至少绘制两横排（第二行不足时为空网格）
 
-        # 1) 逐行逐块绘制 3×5 小格：空格白底浅灰边框，
-        #    主旋律格填旋律色、和弦格填和弦色（每个标记格只填自己的小格 rect）
-        painter.setPen(QPen(COLOR_CELL_BORDER, 1))
+        # 1) 逐行逐块绘制 3×5 小格：空格用背景色填充，
+        #    主旋律格填旋律色、和弦格填和弦色；按样式画内线（no_border 不画）
+        pen_width = inner_pen_width(self._style)
+        if draws_inner_lines(self._style):
+            painter.setPen(QPen(self._border_color, pen_width))
         for line_i in range(n_lines):
             for j in range(cpl):
                 col = line_i * cpl + j
@@ -512,8 +550,16 @@ class SheetWidget(QWidget):
                         elif col < num_cols and self._model.has_note(col, key):
                             painter.fillRect(rect, self._mark_color)
                         else:
-                            painter.fillRect(rect, COLOR_BG)
-                        painter.drawRect(rect)
+                            painter.fillRect(rect, self._bg_color)
+                        if draws_inner_lines(self._style):
+                            painter.drawRect(rect)
+
+        # 1.5) 完整内外边框 / 粗内线+外框：每个节拍块画外框（线宽与内线一致）
+        if draws_outer_frame(self._style):
+            painter.setPen(QPen(self._border_color, pen_width))
+            for line_i in range(n_lines):
+                for j in range(cpl):
+                    painter.drawRect(self._block_rect(line_i, j))
 
         # 2) 光标所在节拍块：整块外框 2px 强调色描边（画在块外围）
         cursor_line = self._cursor_col // cpl

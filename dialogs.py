@@ -4,11 +4,12 @@
 import os
 import subprocess
 
-from PySide6.QtCore import QEvent, QSize, Qt
+from PySide6.QtCore import QEvent, QSize, Qt, Signal
 from PySide6.QtGui import QColor, QPixmap
 from PySide6.QtWidgets import (
     QCheckBox,
     QColorDialog,
+    QComboBox,
     QDialog,
     QFileDialog,
     QInputDialog,
@@ -27,6 +28,10 @@ from PySide6.QtWidgets import (
 )
 
 from export import num_pages, render_page_image
+from grid_style import (
+    DEFAULT_BG_COLOR, DEFAULT_BORDER_COLOR, DEFAULT_STYLE,
+    STYLE_OPTIONS, GridStyle, is_valid_style,
+)
 from file_io import copy_sheet, delete_sheet, list_sheets, rename_sheet
 
 
@@ -36,6 +41,64 @@ def prompt_title(parent, initial: str = "") -> str:
     if ok:
         return text.strip()
     return ""
+
+
+class StyleColorsDialog(QDialog):
+    """样式颜色设置：旋律/和弦/背景/边框 四色，改动实时作用于显示区。
+
+    styleChanged 信号携带最新 GridStyle（随乐谱保存，非临时）。
+    """
+
+    styleChanged = Signal(object)
+
+    def __init__(self, parent=None, style: GridStyle | None = None):
+        super().__init__(parent)
+        self.setWindowTitle("样式颜色")
+        self.resize(320, 260)
+        self._style = style or GridStyle()
+
+        layout = QVBoxLayout(self)
+        hint = QLabel("点击按钮选择颜色，实时生效并随乐谱保存")
+        layout.addWidget(hint)
+
+        self._btn_specs = [
+            ("旋律色", "mark_color"),
+            ("和弦色", "chord_color"),
+            ("背景色", "bg_color"),
+            ("边框色", "border_color"),
+        ]
+        self._buttons: dict[str, QPushButton] = {}
+        for label, attr in self._btn_specs:
+            btn = QPushButton(label)
+            btn.clicked.connect(lambda _=False, a=attr: self._pick(a))
+            self._buttons[attr] = btn
+            layout.addWidget(btn)
+
+        close_btn = QPushButton("关闭")
+        close_btn.clicked.connect(self.accept)
+        layout.addWidget(close_btn)
+        self._refresh()
+
+    # ---------- 内部 ----------
+
+    def _refresh(self):
+        """用当前样式颜色给按钮着色（文字即色标）。"""
+        for attr, btn in self._buttons.items():
+            color = getattr(self._style, attr)
+            btn.setStyleSheet(f"color: {color}; font-weight: bold;")
+
+    def _pick(self, attr: str):
+        color = QColorDialog.getColor(QColor(getattr(self._style, attr)),
+                                      self, "选择颜色")
+        if color.isValid():
+            setattr(self._style, attr, color.name())
+            self._refresh()
+            self.styleChanged.emit(self._style)
+
+    # ---------- 对外取值 ----------
+
+    def style(self) -> GridStyle:
+        return GridStyle(**self._style.__dict__)
 
 
 class BrowseSheetsDialog(QDialog):
@@ -197,6 +260,9 @@ class ExportDialog(QDialog):
 
     def __init__(self, grid, columns_per_line: int, default_title: str = "",
                  mark_color: str | None = None, chord_color: str | None = None,
+                 style: str | None = None,
+                 bg_color: str | None = None,
+                 border_color: str | None = None,
                  default_dir: str = "", parent=None):
         super().__init__(parent)
         self.setWindowTitle("导出预览")
@@ -204,6 +270,9 @@ class ExportDialog(QDialog):
         self._grid = grid
         self._mark_color = mark_color or "#E84848"
         self._chord_color = chord_color or "#4A90D9"
+        self._style = style if is_valid_style(style) else DEFAULT_STYLE
+        self._bg_color = bg_color or DEFAULT_BG_COLOR
+        self._border_color = border_color or DEFAULT_BORDER_COLOR
         self._default_dir = default_dir or os.getcwd()
         self._default_title = (default_title or "").strip()
 
@@ -264,9 +333,31 @@ class ExportDialog(QDialog):
         self.chord_btn.setToolTip("修改和弦标记颜色，实时刷新预览")
         self.chord_btn.clicked.connect(self._choose_chord_color)
         color_row.addWidget(self.chord_btn)
+        self.bg_btn = QPushButton("背景色")
+        self.bg_btn.setToolTip("修改谱面底色，实时刷新预览（仅本次导出）")
+        self.bg_btn.clicked.connect(self._choose_bg_color)
+        color_row.addWidget(self.bg_btn)
+        self.border_btn = QPushButton("边框色")
+        self.border_btn.setToolTip("修改格线/外框颜色，实时刷新预览（仅本次导出）")
+        self.border_btn.clicked.connect(self._choose_border_color)
+        color_row.addWidget(self.border_btn)
         color_row.addStretch(1)
         layout.addLayout(color_row)
         self._sync_color_buttons()
+
+        # 格子样式（仅本次导出生效）
+        style_row = QHBoxLayout()
+        style_row.addWidget(QLabel("格子样式"))
+        self.style_combo = QComboBox()
+        for value, label in STYLE_OPTIONS:
+            self.style_combo.addItem(label, value)
+        self.style_combo.setCurrentIndex(
+            max(0, self.style_combo.findData(self._style)))
+        self.style_combo.currentIndexChanged.connect(self._refresh)
+        style_row.addWidget(self.style_combo)
+        style_row.addWidget(QLabel("（仅本次导出生效）"))
+        style_row.addStretch(1)
+        layout.addLayout(style_row)
 
         # 每页行列数
         page_row = QHBoxLayout()
@@ -338,7 +429,9 @@ class ExportDialog(QDialog):
         title = self.display_name() if self.draw_title_check.isChecked() else None
         img = render_page_image(self._grid, cols, rows,
                                 self.page_spin.value() - 1,
-                                self._mark_color, self._chord_color, title)
+                                self._mark_color, self._chord_color, title,
+                                style=self._style, bg_color=self._bg_color,
+                                border_color=self._border_color)
         self._full_pixmap = QPixmap.fromImage(img)
         self._apply_preview_scale()
 
@@ -383,12 +476,29 @@ class ExportDialog(QDialog):
             self._sync_color_buttons()
             self._refresh()
 
+    def _choose_bg_color(self):
+        color = QColorDialog.getColor(QColor(self._bg_color), self, "选择背景颜色")
+        if color.isValid():
+            self._bg_color = color.name()
+            self._sync_color_buttons()
+            self._refresh()
+
+    def _choose_border_color(self):
+        color = QColorDialog.getColor(QColor(self._border_color), self, "选择边框颜色")
+        if color.isValid():
+            self._border_color = color.name()
+            self._sync_color_buttons()
+            self._refresh()
+
     def _sync_color_buttons(self):
         """用当前标记颜色给颜色按钮着色（文字即色标）。"""
         self.mark_btn.setStyleSheet(
             f"color: {self._mark_color}; font-weight: bold;")
         self.chord_btn.setStyleSheet(
             f"color: {self._chord_color}; font-weight: bold;")
+        self.bg_btn.setStyleSheet(f"color: {self._bg_color}; font-weight: bold;")
+        self.border_btn.setStyleSheet(
+            f"color: {self._border_color}; font-weight: bold;")
 
     # ---------- 对外取值 ----------
 
@@ -416,6 +526,19 @@ class ExportDialog(QDialog):
     def chord_color(self) -> str:
         """当前和弦标记颜色（#RRGGBB，导出用）。"""
         return self._chord_color
+
+    def style(self) -> str:
+        """本次导出的格子样式（临时，不写回乐谱）。"""
+        value = self.style_combo.currentData()
+        return value if is_valid_style(value) else DEFAULT_STYLE
+
+    def bg_color(self) -> str:
+        """本次导出的背景色（临时）。"""
+        return self._bg_color
+
+    def border_color(self) -> str:
+        """本次导出的边框色（临时）。"""
+        return self._border_color
 
     def layered(self) -> bool:
         """True=分层（每谱一个子文件夹），False=平铺。"""

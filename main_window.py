@@ -27,11 +27,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from model import NoteGrid
+from model import DEFAULT_CHORD_COLOR, DEFAULT_MARK_COLOR, NoteGrid
 from grid_style import (DEFAULT_BORDER_COLOR, DEFAULT_BG_COLOR, DEFAULT_STYLE,
-                        STYLE_OPTIONS, is_valid_style)
+                        STYLE_OPTIONS, GridStyle, is_valid_style)
 from file_io import default_data_dir, default_output_dir, load_ggp, save_ggp
-from dialogs import BrowseSheetsDialog, ExportDialog, prompt_title
+from dialogs import BrowseSheetsDialog, ExportDialog, StyleColorsDialog, prompt_title
 from sheet_widget import LINE_GAP, MARGIN_Y, SheetWidget
 from key_panel import (
     KeyPanel, MODE_BLANK, MODE_KEY, MODE_LETTER, MODE_TONE,
@@ -88,6 +88,11 @@ class MainWindow(QMainWindow):
         self.style_combo.setToolTip("格子谱样式：边框形态（默认/完整内外边框/无外边框/无边框纯色块/粗内线/粗内线+外框）")
         self.style_combo.currentIndexChanged.connect(self._on_style_changed)
         self.toolbar.addWidget(self.style_combo)
+
+        style_colors_btn = QPushButton("样式颜色")
+        style_colors_btn.setToolTip("自定义旋律/和弦/背景/边框颜色（随乐谱保存）")
+        style_colors_btn.clicked.connect(self.open_style_colors)
+        self.toolbar.addWidget(style_colors_btn)
 
         self.toolbar.addSeparator()
 
@@ -558,6 +563,36 @@ class MainWindow(QMainWindow):
             self._mark_dirty()
             self.statusBar().showMessage(f"格子样式已切换：{style}", 3000)
 
+    def open_style_colors(self):
+        """打开样式颜色对话框：四色实时作用于显示区并随乐谱保存。"""
+        dlg = StyleColorsDialog(
+            self, GridStyle.coerce(style=self._style,
+                                   bg_color=self._bg_color,
+                                   border_color=self._border_color,
+                                   mark_color=self._mark_color,
+                                   chord_color=self._chord_color))
+        dlg.styleChanged.connect(self._apply_style_colors)
+        dlg.exec()
+
+    def _apply_style_colors(self, gs: GridStyle):
+        """应用样式颜色（实时预览，置脏）。"""
+        self._style = gs.style
+        self._bg_color = gs.bg_color if gs.bg_color != DEFAULT_BG_COLOR else None
+        self._border_color = (gs.border_color
+                              if gs.border_color != DEFAULT_BORDER_COLOR else None)
+        self._mark_color = gs.mark_color if gs.mark_color != DEFAULT_MARK_COLOR else None
+        self._chord_color = (gs.chord_color
+                             if gs.chord_color != DEFAULT_CHORD_COLOR else None)
+        self.sheet.set_style(gs.style)
+        self.sheet.set_bg_color(QColor(gs.bg_color))
+        self.sheet.set_border_color(QColor(gs.border_color))
+        self.sheet.set_mark_color(QColor(gs.mark_color))
+        self.sheet.set_chord_color(QColor(gs.chord_color))
+        idx = self.style_combo.findData(gs.style)
+        if idx >= 0:
+            self.style_combo.setCurrentIndex(idx)
+        self._mark_dirty()
+
     # ---------- 动作：导出 PNG ----------
 
     def export_png(self):
@@ -568,6 +603,9 @@ class MainWindow(QMainWindow):
             default_title=self.title_edit.text().strip(),
             mark_color=self.sheet.mark_color().name(),
             chord_color=self.sheet.chord_color().name(),
+            style=self._style,
+            bg_color=self.sheet.bg_color().name(),
+            border_color=self.sheet.border_color().name(),
             default_dir=str(default_output_dir()),
             parent=self)
         if dlg.exec() != QDialog.Accepted:
@@ -576,6 +614,8 @@ class MainWindow(QMainWindow):
         ok, pages = export_pages(
             path_base, self._model, dlg.columns_per_line(), dlg.rows_per_page(),
             mark_color=dlg.mark_color(), chord_color=dlg.chord_color(),
+            style=dlg.style(), bg_color=dlg.bg_color(),
+            border_color=dlg.border_color(),
             title=dlg.display_name(), draw_title=dlg.draw_title())
         if ok:
             if pages > 1:

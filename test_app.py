@@ -1536,6 +1536,18 @@ def main() -> int:
         check("T32k 切换下拉框实时生效",
               window.sheet.style() == "full_frame" and window._style == "full_frame")
 
+        # ---------------- T32l: 导出对话框临时样式 ----------------
+        ed = dlg.ExportDialog(NoteGrid(2), 4, default_title="Temp",
+                              style="default")
+        ed.style_combo.setCurrentIndex(ed.style_combo.findData("thick_frame"))
+        ed._bg_color = "#FFEEDD"
+        check("T32l 导出对话框样式读取为临时值",
+              ed.style() == "thick_frame" and ed.bg_color() == "#FFEEDD")
+        check("T32m 导出临时样式不影响乐谱保存值",
+              window.sheet.style() == "full_frame"
+              and window._style == "full_frame")
+        ed.close()
+
         window.close()   # closeEvent：dirty=True → question 已注入 Yes → 放行
 
         # ---------------- 汇总 ----------------

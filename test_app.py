@@ -1575,6 +1575,13 @@ def main() -> int:
               f"h4w={tf.heightForWidth(2000)}")
         tf.close()
 
+        # ---------------- T32v: 工具栏按钮悬停文字可见（无容器样式表覆盖悬停） ----------------
+        import main as main_mod
+        check("T32v 工具栏无容器级样式表且应用样式含悬停规则",
+              window.toolbar.styleSheet() == ""
+              and "QPushButton:hover" in main_mod.STYLE_SHEET
+              and "#toolbarFlow" in main_mod.STYLE_SHEET)
+
         # ---------------- T32n: 连续贯通格线（非默认样式） ----------------
         img_no = render_page_image(g1, 4, 1, 0, style="no_outer")
         x_mid = EX_M + EX_MINI + EXPORT_MINI_GAP + EX_MINI // 2   # 第2列空格内部

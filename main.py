@@ -34,6 +34,14 @@ QToolBar::separator {
     background: #E0E0E0;
     margin: 4px 6px;
 }
+#toolbarFlow {
+    background-color: #FFFFFF;
+    border-bottom: 1px solid #E0E0E0;
+    padding: 4px;
+}
+#toolbarFlow QPushButton {
+    padding: 4px 10px;
+}
 QLineEdit, QComboBox {
     background-color: #FFFFFF;
     border: 1px solid #D0D0D0;

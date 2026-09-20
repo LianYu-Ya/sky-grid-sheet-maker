@@ -132,9 +132,9 @@ class ToolbarFlow(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setStyleSheet(
-            "background-color: #FFFFFF; border-bottom: 1px solid #E0E0E0;"
-            "QPushButton { padding: 4px 10px; }")
+        self.setObjectName("toolbarFlow")
+        # 外观样式放在应用级样式表（#toolbarFlow 选择器），避免容器级样式表
+        # 覆盖应用级 QPushButton:hover 规则导致悬停时文字不可见
         self._layout = FlowLayout(self)
         self.setLayout(self._layout)
 

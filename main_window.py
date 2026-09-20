@@ -31,7 +31,10 @@ from model import DEFAULT_CHORD_COLOR, DEFAULT_MARK_COLOR, NoteGrid
 from grid_style import (DEFAULT_BORDER_COLOR, DEFAULT_BG_COLOR, DEFAULT_STYLE,
                         STYLE_OPTIONS, GridStyle, is_valid_style)
 from file_io import default_data_dir, default_output_dir, load_ggp, save_ggp
-from dialogs import BrowseSheetsDialog, ExportDialog, StyleColorsDialog, prompt_title
+from dialogs import (
+    BrowseSheetsDialog, ExportDialog, StickyComboBox, StyleColorsDialog,
+    prompt_title,
+)
 from sheet_widget import LINE_GAP, MARGIN_Y, SheetWidget
 from key_panel import (
     KeyPanel, MODE_BLANK, MODE_KEY, MODE_LETTER, MODE_TONE,
@@ -82,7 +85,7 @@ class MainWindow(QMainWindow):
         self.toolbar.addWidget(chord_color_btn)
 
         self.toolbar.addWidget(QLabel("格子样式"))
-        self.style_combo = QComboBox()
+        self.style_combo = StickyComboBox()
         self.style_combo.setSizeAdjustPolicy(
             QComboBox.SizeAdjustPolicy.AdjustToContents)   # 始终完全展开显示当前样式
         for value, label in STYLE_OPTIONS:

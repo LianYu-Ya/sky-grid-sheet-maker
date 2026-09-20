@@ -3,7 +3,7 @@
 
 import os
 
-from PySide6.QtCore import QEvent, QTimer, Qt, QUrl
+from PySide6.QtCore import QEvent, QPoint, QRect, QSize, QTimer, Qt, QUrl
 from PySide6.QtGui import QColor, QDesktopServices
 from PySide6.QtWidgets import (
     QButtonGroup,
@@ -12,7 +12,9 @@ from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
     QDockWidget,
+    QFrame,
     QLabel,
+    QLayout,
     QLineEdit,
     QMainWindow,
     QMessageBox,
@@ -22,7 +24,6 @@ from PySide6.QtWidgets import (
     QSizePolicy,
     QSpinBox,
     QSplitter,
-    QToolBar,
     QVBoxLayout,
     QWidget,
 )
@@ -42,6 +43,102 @@ from key_panel import (
 from export import export_pages
 
 
+class FlowLayout(QLayout):
+    """可换行布局：控件放不下时自动换到下一行，永不收起/溢出。
+
+    标准 Qt FlowLayout 示例的裁剪实现，用于工具栏。
+    """
+
+    def __init__(self, parent=None, margin: int = 4, spacing: int = 6):
+        super().__init__(parent)
+        self._items: list = []
+        self.setContentsMargins(margin, margin, margin, margin)
+        self.setSpacing(spacing)
+
+    def addItem(self, item):
+        self._items.append(item)
+
+    def count(self) -> int:
+        return len(self._items)
+
+    def itemAt(self, index):
+        return self._items[index] if 0 <= index < len(self._items) else None
+
+    def takeAt(self, index):
+        if 0 <= index < len(self._items):
+            return self._items.pop(index)
+        return None
+
+    def expandingDirections(self):
+        return Qt.Orientation(0)
+
+    def hasHeightForWidth(self):
+        return True
+
+    def heightForWidth(self, width: int) -> int:
+        return self._do_layout(QRect(0, 0, width, 0), True)
+
+    def setGeometry(self, rect: QRect):
+        super().setGeometry(rect)
+        self._do_layout(rect, False)
+
+    def sizeHint(self) -> QSize:
+        return self.minimumSize()
+
+    def minimumSize(self) -> QSize:
+        size = QSize()
+        for item in self._items:
+            size = size.expandedTo(item.minimumSize())
+        m = self.contentsMargins()
+        size += QSize(m.left() + m.right(), m.top() + m.bottom())
+        return size
+
+    def _do_layout(self, rect: QRect, test_only: bool) -> int:
+        m = self.contentsMargins()
+        effective = rect.adjusted(m.left(), m.top(), -m.right(), -m.bottom())
+        x, y = effective.x(), effective.y()
+        line_height = 0
+        spacing = self.spacing()
+        for item in self._items:
+            hint = item.sizeHint()
+            next_x = x + hint.width() + spacing
+            if next_x - spacing > effective.right() and line_height > 0:
+                x = effective.x()
+                y += line_height + spacing
+                next_x = x + hint.width() + spacing
+                line_height = 0
+            if not test_only:
+                item.setGeometry(QRect(QPoint(x, y), hint))
+            x = next_x
+            line_height = max(line_height, hint.height())
+        return y + line_height - rect.y() + m.bottom()
+
+
+class ToolbarFlow(QWidget):
+    """可换行的顶部工具栏容器：所有控件始终显示，放不下自动换行，不出现溢出收起按钮。"""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setStyleSheet(
+            "background-color: #FFFFFF; border-bottom: 1px solid #E0E0E0;"
+            "QPushButton { padding: 4px 10px; }")
+        self._layout = FlowLayout(self)
+        self.setLayout(self._layout)
+
+    def addWidget(self, widget):
+        self._layout.addWidget(widget)
+
+    def addSpacing(self, spacing: int):
+        self._layout.addSpacing(spacing)
+
+    def addSeparator(self):
+        sep = QFrame()
+        sep.setFrameShape(QFrame.Shape.VLine)
+        sep.setFixedHeight(20)
+        sep.setStyleSheet("color: #E0E0E0; background: #E0E0E0;")
+        self._layout.addWidget(sep)
+
+
 class MainWindow(QMainWindow):
     """光遇格子谱制作器主窗口。"""
 
@@ -59,10 +156,9 @@ class MainWindow(QMainWindow):
         self._bg_color: str | None = None                # None=默认背景色
         self._border_color: str | None = None            # None=默认边框色
 
-        # ---------- 顶部工具栏 ----------
-        self.toolbar = QToolBar("工具栏", self)
-        self.toolbar.setMovable(False)
-        self.addToolBar(self.toolbar)
+        # ---------- 顶部工具栏（可换行容器：控件始终显示、永不收起） ----------
+        self.toolbar = ToolbarFlow(self)
+        self.setMenuWidget(self.toolbar)
 
         self.title_edit = QLineEdit()
         self.title_edit.setPlaceholderText("输入乐谱标题")

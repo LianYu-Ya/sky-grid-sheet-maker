@@ -185,7 +185,7 @@ def main() -> int:
         panel = window.key_panel
 
         # ---------------- T1: 主窗口四区 + QSplitter + QSpinBox ----------------
-        check("T1a 工具栏存在", isinstance(window.toolbar, mw.QToolBar))
+        check("T1a 工具栏存在", isinstance(window.toolbar, mw.ToolbarFlow))
         check("T1b 中央为 QSplitter 且上部滚动区承载 SheetWidget",
               isinstance(window.centralWidget(), QSplitter)
               and window.centralWidget().widget(0) is window.scroll
@@ -1575,6 +1575,21 @@ def main() -> int:
             scb.mousePressEvent(ev)          # 再次点击 → 收起
             check("T32s 粘滞下拉框：再次点击收起", not scb._stick)
         scb.close()
+
+        # ---------------- T32t: 工具栏可换行不收起 ----------------
+        from main_window import ToolbarFlow
+        tf = ToolbarFlow()
+        for _i in range(12):
+            tb = QPushButton(f"B{_i}")
+            tb.setFixedWidth(80)
+            tf.addWidget(tb)
+        check("T32t 工具栏窄时换行增高（不收起）",
+              tf.heightForWidth(400) > 50,
+              f"h4w={tf.heightForWidth(400)}")
+        check("T32u 工具栏宽时单行",
+              tf.heightForWidth(2000) <= 50,
+              f"h4w={tf.heightForWidth(2000)}")
+        tf.close()
 
         # ---------------- T32n: 连续贯通格线（非默认样式） ----------------
         img_no = render_page_image(g1, 4, 1, 0, style="no_outer")
